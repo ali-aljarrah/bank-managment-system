@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axiosClient from "../axios";
+import Spinner from "react-bootstrap/Spinner";
+import Swal from 'sweetalert2';
 
 export default function AdminDepostiMoney() {
   const [accountNumber, setAccountNumber] = useState("");
@@ -16,7 +18,7 @@ export default function AdminDepostiMoney() {
     await axiosClient
         .get("/getAccounts")
         .then((response) => {
-            const accountsData = response.data.data;
+            const accountsData = response.data.data.data;
             setAllAccounts(accountsData);
         })
         .catch((error) => {
@@ -26,23 +28,33 @@ export default function AdminDepostiMoney() {
 
   const handleDeposit = (e) => {
     e.preventDefault();
+    setRefresh(true);
     setError({ __html: "" });
 
-    axiosClient
-    .post("/AdminDeposit", {
-        account: accountNumber,
-        amount: depositAmount
+    axiosClient.get('/csrf-cookie').then(() => {
+      axiosClient
+      .post("/AdminDeposit", {
+          account: accountNumber,
+          amount: depositAmount
+      })
+      .then((response) => {
+          Swal.fire({
+            icon: 'success',
+            title: 'Deposit done successfully',
+            showConfirmButton: false,
+            timer: 2500
+        });
+          setRefresh(false);
+      })
+      .catch((error) => {
+        setRefresh(false);
+          if(error.response) {
+              setError({__html: error.response.data.message})
+          } else {
+              console.error(error);
+          }
+      });
     })
-    .then((response) => {
-        alert('Deposit done successfully');
-    })
-    .catch((error) => {
-        if(error.response) {
-            setError({__html: error.response.data.error})
-        } else {
-            console.error(error);
-        }
-    });
   }
 
   return (
@@ -72,7 +84,7 @@ export default function AdminDepostiMoney() {
           <div className="col-md-4 mb-4 mb-md-0">
             <div className="form-group">
               <label className="form-label" htmlFor="depositAmount">Deposit amount</label>
-              <input placeholder="Enter the amount you wish to deposit" className="form-control" type="text" name="depositAmount" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+              <input placeholder="Enter the amount you wish to deposit" className="form-control" type="number" name="depositAmount" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
             </div>
           </div>
           <div className="col-md-12 mt-4 mb-4 mb-md-0">
@@ -80,8 +92,23 @@ export default function AdminDepostiMoney() {
                   <button
                       className="btn btn-primary"
                       type="submit"
+                      disabled={refresh}
                   >
-                      Deposit
+                      {refresh ? (
+                          <Spinner
+                              animation="border"
+                              role="status"
+                              size="sm"
+                          >
+                              <span className="visually-hidden">
+                                  Loading...
+                              </span>
+                          </Spinner>
+                      ) : (
+                          <span className="btn-text">
+                              Deposit{" "}
+                          </span>
+                      )}
                   </button>
               </div>
           </div>

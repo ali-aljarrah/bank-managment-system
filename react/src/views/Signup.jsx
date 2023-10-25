@@ -19,26 +19,28 @@ export default function Signup() {
 
         setError({ __html: "" });
 
-        axiosClient
-            .post("/signup", {
-                name: fullName,
-                email: email,
-                password: password,
-            })
-            .then(({ data }) => {
-                setCurrentUser(data.user);
-                setUserToken(data.token);
-            })
-            .catch((error) => {
-                if(error.response) {
-                    const formErrors = Object.values(error.response.data.errors).reduce((accum, next) => 
-                    [...next, ...accum] ,[]);
-
-                    setError({__html: formErrors.join('<br>')})
-                } else {
-                    console.error(error);
-                }
-            });
+        axiosClient.get('/csrf-cookie').then(() => {
+            axiosClient
+                .post("/signup", {
+                    name: fullName,
+                    email: email,
+                    password: password,
+                })
+                .then(({ data }) => {
+                    setCurrentUser(data.user);
+                    setUserToken(data.token);
+                })
+                .catch((error) => {
+                    if(error.response) {
+                        const formErrors = Object.values(error.response.data.errors).reduce((accum, next) => 
+                        [...next, ...accum] ,[]);
+    
+                        setError({__html: formErrors.join('<br>')})
+                    } else {
+                        console.error(error);
+                    }
+                });
+        })
     };
     return (
         <div className="container mt-5">

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { userStateContext } from "../context/ContextProvider";
 import axiosClient from '../axios';
+import Spinner from 'react-bootstrap/Spinner';
 
 export default function AdminSignup() {
     const { currentUser, userToken, setCurrentUser, setUserToken } = userStateContext();
@@ -9,6 +10,7 @@ export default function AdminSignup() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState({ __html: "" });
+    const [disabpeBtn, setDisableBtn] = useState(false);
 
 
 
@@ -18,20 +20,23 @@ export default function AdminSignup() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-
+        setDisableBtn(true);
         setError({ __html: "" });
 
-        axiosClient
+        axiosClient.get('/csrf-cookie').then(() => {
+            axiosClient
             .post("/AdminSignup", {
                 name: fullName,
                 email: email,
                 password: password,
             })
             .then(({ data }) => {
+                setDisableBtn(false);
                 setCurrentUser(data.user);
                 setUserToken(data.token);
             })
             .catch((error) => {
+                setDisableBtn(false);
                 if(error.response) {
                     const formErrors = Object.values(error.response.data.errors).reduce((accum, next) => 
                     [...next, ...accum] ,[]);
@@ -41,6 +46,8 @@ export default function AdminSignup() {
                     console.error(error);
                 }
             });
+        })
+
     };
 
     return (
@@ -108,8 +115,13 @@ export default function AdminSignup() {
                                 <button
                                     className="btn btn-primary"
                                     type="submit"
+                                    disabled={disabpeBtn}
                                 >
-                                    Signup
+                                    {disabpeBtn ? 
+                                        <Spinner animation="border" role="status" size="sm">
+                                            <span className="visually-hidden">Loading...</span>
+                                        </Spinner> :  <span className="btn-text">Signup</span>
+                                    }
                                 </button>
                             </div>
                         </form>

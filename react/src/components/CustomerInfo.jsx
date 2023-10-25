@@ -2,19 +2,54 @@ import React, { useEffect, useState } from 'react';
 import axiosClient from '../axios';
 import Moment from 'moment';
 import { userStateContext } from "../context/ContextProvider";
+import DataTable from 'react-data-table-component';
 
 export default function CustomerInfo() {
     const { currentUser, userToken, setCurrentUser, setUserToken } = userStateContext();
     const [customerAccounts, setCustomerAccounts] = useState({});
+    const [page, setPage] = useState(1);
+    const countPerPage = 5;
 
     const user = JSON.parse(currentUser);
 
+    const columns = [
+        {
+            name: 'Account ID',
+            selector: row => row.id,
+            sortable: true,
+            id: 'Account ID',
+            style: {
+                maxWidth: '130px'
+            }
+        },
+        {
+            name: 'Account number',
+            selector: row => row.account_number,
+            sortable: true
+        },
+        {
+            name: 'Account country',
+            selector: row => row.account_country,
+            sortable: true
+        },
+        {
+            name: 'Balance',
+            selector: row => row.account_symbol + " " + row.balance,
+            sortable: true
+        },
+        {
+            name: 'Created at',
+            selector: row => Moment(row.created_at).format("MMMM Do, YYYY H:mma"),
+            sortable: true
+        },
+    ];
+
     useEffect(()=>{
         fetchCustomerAccounts();
-    },[]);
+    },[page]);
 
-    const fetchCustomerAccounts = async () => {
-        await axiosClient.get('/getCustomerAccounts')
+    const fetchCustomerAccounts = () => {
+        axiosClient.get(`/getCustomerAccounts?page=${page}&per_page=${countPerPage}&delay=1`)
         .then((response) => {
             const accountsData = response.data.accounts;
             setCustomerAccounts(accountsData);
@@ -43,34 +78,20 @@ export default function CustomerInfo() {
                     <span className="fw-bold">Email address:</span> {user.email}
                 </p>
             </div>
-            <div className='mt-5'>
-                <p className='fs-5 fw-bold'>Your accounts:</p>
-            </div>
-            <div className="table-responsive">
-                <table className='table table-striped table-hover'>
-                    <thead>
-                        <tr>
-                            <th>Account ID</th>
-                            <th>Account number</th>
-                            <th>Account country</th>
-                            <th>Balance</th>
-                            <th>Created at</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {Array.isArray(customerAccounts) ? customerAccounts.map((account) => {
-                            return (
-                                <tr key={account.id}>
-                                    <td>{account.id}</td>
-                                    <td>{account.account_number}</td>
-                                    <td>{account.account_country}</td>
-                                    <td>{account.account_symbol} {account.balance}</td>
-                                    <td>{Moment(account.created_at).format('MMMM Do, YYYY H:mma')}</td>
-                                </tr>
-                            )
-                        }) : null}
-                    </tbody>
-                </table>
+            <div className="table-responsive mt-5">
+                <DataTable 
+                    title="Your accounts"
+                    columns={columns} 
+                    data={customerAccounts.data} 
+                    pagination 
+                    paginationServer
+                    paginationTotalRows={customerAccounts.total}
+                    paginationPerPage={countPerPage}
+                    paginationComponentOptions={{
+                        noRowsPerPage: true
+                    }}
+                      onChangePage={page => setPage(page)}
+                />
             </div>
         </div>
     );
