@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SignupRequest;
 use App\Mail\SendMail;
+use App\Models\Account;
+use App\Models\Transactions;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,12 +16,13 @@ use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
+    // Admin function to get all users
     public function getAllCustomers()
     {
         $user = Auth::user();
 
         if ($user->role_as === 1) {
-            $users = User::where('role_as', 0)->get();
+            $users = User::where('role_as', 0)->paginate(5);
 
             return response(['data' => $users]);
         } else {
@@ -29,6 +32,7 @@ class AdminController extends Controller
         }
     }
 
+    // Create user account from admin panel and sending email to the customer
     public function adminCreateUser(SignupRequest $request)
     {
         $data = $request->validated();
@@ -48,23 +52,29 @@ class AdminController extends Controller
             'password' => $data['password']
         ];
 
-        Mail::to($data['email'])->send(new SendMail($mailData));
+        try {
+            Mail::to($data['email'])->send(new SendMail($mailData));
+        } catch (\Throwable $th) {
+            return response([
+                'error' => 'Customer account created successfully but could not send an email!'
+            ]);
+        }
 
         return response(['success' => true]);
     }
 
+    // Create bank account for the customer from the admin panel
     public function adminCreateAccount(Request $request)
     {
-        $customer_email = $request['email'];
-        $account_country_info = $request['country'];
+        $data = $request->validate([
+            'email' => 'required|email',
+            'country' => 'required|string'
+        ]);
 
+        $customer_email = $data['email'];
+        $account_country_info = $data['country'];
 
-        if (empty($customer_email) || empty($account_country_info)) {
-            return response([
-                'error' => 'The provided credentials are not correct'
-            ], 422);
-        }
-
+        // Get the country code from the request
         $account_country_info = explode("|", $account_country_info);
 
         $account_symbol = $account_country_info[0];
@@ -79,7 +89,7 @@ class AdminController extends Controller
 
         $current_time = Carbon::now();
 
-        DB::table('accounts')->insert([
+        Account::create([
             'email' => $customer_email,
             'customer_id' => $customer_id,
             'account_number' => $account_number,
@@ -95,12 +105,13 @@ class AdminController extends Controller
         ]);
     }
 
+    // Get all bank accounts
     public function getAccounts()
     {
         $user = Auth::user();
 
         if ($user->role_as === 1) {
-            $accounts = DB::table('accounts')->get();
+            $accounts = Account::paginate(5);
 
             return response(['data' => $accounts]);
         } else {
@@ -110,30 +121,30 @@ class AdminController extends Controller
         }
     }
 
+    // Deposit money in the bank account from admin
     public function depositMoney(Request $request) {
+
+        $data = $request->validate([
+            'account' => 'required|string',
+            'amount' => 'required|integer'
+        ]);
 
         $user = Auth::user();
 
         if ($user->role_as === 1) {
-            $account_number = $request['account'];
-            $deposit_amount = $request['amount'];
+            $account_number = $data['account'];
+            $deposit_amount = $data['amount'];
 
-
-            if (empty($account_number) || empty($deposit_amount)) {
-                return response([
-                    'error' => 'The provided credentials are not correct'
-                ], 422);
-            }
-
-            $customer_account = DB::table('accounts')->where('account_number', $account_number)->first();
+            $customer_account = Account::where('account_number', $account_number)->first();
 
             $new_balance = $customer_account->balance + $deposit_amount;
 
-            DB::table('accounts')->where('account_number', $account_number)->update(['balance' => $new_balance]);
+            Account::where('account_number', $account_number)->update(['balance' => $new_balance]);
 
             return response([
                 'success' => true,
             ]);
+
         } else {
             return response([
                 'error' => 'Not found'
@@ -141,11 +152,12 @@ class AdminController extends Controller
         }
     }
 
+    // Get all transactions
     public function getTransactions() {
         $user = Auth::user();
 
         if ($user->role_as === 1) {
-            $transactions = DB::table('transactions')->get();
+            $transactions = Transactions::paginate(5);
 
             return response(['data' => $transactions]);
         } else {

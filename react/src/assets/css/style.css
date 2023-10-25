@@ -1,3 +1,10 @@
 .w-300 {
     width: 300px;
 }
+
+[data-column-id="Customer ID"].rdt_TableCol,
+[data-column-id="Account ID"].rdt_TableCol,
+[data-column-id="Transaction ID"].rdt_TableCol,
+[data-column-id="Account ID"].rdt_TableCol {
+    max-width: 130px;
+}

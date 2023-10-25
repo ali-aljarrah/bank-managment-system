@@ -1,25 +1,72 @@
 import React, { useEffect, useState } from "react";
 import axiosClient from "../axios";
 import Moment from "moment";
+import Spinner from "react-bootstrap/Spinner";
+import Swal from 'sweetalert2';
+import DataTable from 'react-data-table-component';
 
 export default function CustomersAccounts() {
     const [allUsers, setAllUsers] = useState({});
     const [allAccounts, setAllAccounts] = useState({});
+    const [page, setPage] = useState(1);
+    const countPerPage = 5;
     const [countries, setCountries] = useState({});
     const [accountEmail, setAccountEmail] = useState("");
     const [accountCountry, setAccountCountry] = useState("");
     const [error, setError] = useState({ __html: "" });
     const [refresh, setRefresh] = useState(false);
 
+    const columns = [
+        {
+            name: 'Account ID',
+            selector: row => row.id,
+            sortable: true,
+            id: 'Account ID',
+            style: {
+                maxWidth: '130px'
+            }
+        },
+        {
+            name: 'Account email',
+            selector: row => row.email,
+            sortable: true
+        },
+        {
+            name: 'Account number',
+            selector: row => row.account_number,
+            sortable: true
+        },
+        {
+            name: 'Account country',
+            selector: row => row.account_country,
+            sortable: true
+        },
+        {
+            name: 'Account balance',
+            selector: row => row.account_symbol + " " +row.balance,
+            sortable: true
+        },
+        {
+            name: 'Created at',
+            selector: row => Moment(row.created_at).format("MMMM Do, YYYY H:mma"),
+            sortable: true
+        },
+        {
+            name: 'Updated at',
+            selector: row => Moment(row.updated_at).format("MMMM Do, YYYY H:mma"),
+            sortable: true
+        },
+    ];
+
     useEffect(() => {
         fetchAccounts();
         fetchUsers();
         fetchCountries();
-    }, [refresh]);
+    }, [refresh, page]);
 
-    const fetchAccounts = async () => {
-        await axiosClient
-            .get("/getAccounts")
+    const fetchAccounts = () => {
+        axiosClient
+            .get(`/getAccounts?page=${page}&per_page=${countPerPage}&delay=1`)
             .then((response) => {
                 const accountsData = response.data.data;
                 setAllAccounts(accountsData);
@@ -35,10 +82,10 @@ export default function CustomersAccounts() {
         setCountries(data);
     };
     
-    const fetchUsers = async () => {
-        await axiosClient.get('/getUsers')
+    const fetchUsers = () => {
+        axiosClient.get('/getUsers')
         .then((response) => {
-            const usersData = response.data.data;
+            const usersData = response.data.data.data;
             setAllUsers(usersData);
         }).catch((error)=>{
             console.error(error);
@@ -50,24 +97,34 @@ export default function CustomersAccounts() {
         setRefresh(true);
         setError({ __html: "" });
 
-        axiosClient
-            .post("/AdminCreateAccount", {
-                email: accountEmail,
-                country: accountCountry
-            })
-            .then((response) => {
-                alert('Account created successfully');
-                setRefresh(false);
-            })
-            .catch((error) => {
-                if(error.response) {
-                    setError({__html: error.response.data.error})
-                } else {
-                    console.error(error);
-                }
-            });
+        axiosClient.get('/csrf-cookie').then(() => {
+            axiosClient
+                .post("/AdminCreateAccount", {
+                    email: accountEmail,
+                    country: accountCountry
+                })
+                .then((response) => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Account created successfully',
+                        showConfirmButton: false,
+                        timer: 2500
+                    });
+                    accountEmail("");
+                    setRefresh(false);
+                })
+                .catch((error) => {
+                    setRefresh(false);
+                    if(error.response) {
+                        setError({__html: error.response.data.message})
+                    } else {
+                        console.error(error);
+                    }
+                });
+        })
 
     }
+    
     return (
         <div className="mt-4">
             <div className="my-3">
@@ -115,8 +172,23 @@ export default function CustomersAccounts() {
                                 <button
                                     className="btn btn-primary"
                                     type="submit"
+                                    disabled={refresh}
                                 >
-                                    Create account
+                                    {refresh ? (
+                                        <Spinner
+                                            animation="border"
+                                            role="status"
+                                            size="sm"
+                                        >
+                                            <span className="visually-hidden">
+                                                Loading...
+                                            </span>
+                                        </Spinner>
+                                    ) : (
+                                        <span className="btn-text">
+                                            Create account{" "}
+                                        </span>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -124,44 +196,18 @@ export default function CustomersAccounts() {
                 </form>
             </div>
             <div className="table-responsive mt-5">
-                <table className="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Account ID</th>
-                            <th>Account email</th>
-                            <th>Account number</th>
-                            <th>Account country</th>
-                            <th>Account balance</th>
-                            <th>Created at</th>
-                            <th>Updated at</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {Array.isArray(allAccounts)
-                            ? allAccounts.map((account) => {
-                                  return (
-                                      <tr key={account.id}>
-                                          <td>{account.id}</td>
-                                          <td>{account.email}</td>
-                                          <td>{account.account_number}</td>
-                                          <td>{account.account_country}</td>
-                                          <td>{account.account_symbol} {account.balance}</td>
-                                          <td>
-                                              {Moment(account.created_at).format(
-                                                  "MMMM Do, YYYY H:mma"
-                                              )}
-                                          </td>
-                                          <td>
-                                              {Moment(account.updated_at).format(
-                                                  "MMMM Do, YYYY H:mma"
-                                              )}
-                                          </td>
-                                      </tr>
-                                  );
-                              })
-                            : null}
-                    </tbody>
-                </table>
+                <DataTable 
+                    columns={columns} 
+                    data={allAccounts.data} 
+                    pagination 
+                    paginationServer
+                    paginationTotalRows={allAccounts.total}
+                    paginationPerPage={countPerPage}
+                    paginationComponentOptions={{
+                        noRowsPerPage: true
+                    }}
+                      onChangePage={page => setPage(page)}
+                />
             </div>
         </div>
     );
